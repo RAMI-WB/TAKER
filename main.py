@@ -1,48 +1,50 @@
-import search_engine
-import extractor
+import requests
+from bs4 import BeautifulSoup
+import trafilatura
+import random
 
-def taker_action(user_request, category):
-    print(f"\n🚀 TAKER في مهمة لإحضار: {user_request}")
-    
-    # 1. بناء استعلام ذكي بناءً على النوع
-    query = user_request
-    if category == "book":
-        query = f'"{user_request}" filetype:pdf OR filetype:epub'
-    elif category == "tool":
-        query = f'"{user_request}" (filetype:exe OR filetype:zip OR site:github.com)'
-    
-    # 2. البحث عن الروابط
-    links = search_engine.get_links(query, max_results=5)
-    
-    if not links:
-        print("❌ لم يجد TAKER أي مسار لهذا الطلب.")
-        return
+# قائمة User-Agents لجعل TAKER يبدو كمتصفحات مختلفة لتجنب الحظر
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Firefox/115.0"
+]
 
-    print(f"✅ وجد TAKER {len(links)} مسارات محتملة. جاري فحص الروابط المباشرة...")
+def take_content(url):
+    """استخراج النص الصافي من الصفحة بذكاء."""
+    headers = {'User-Agent': random.choice(USER_AGENTS)}
+    try:
+        response = requests.get(url, headers=headers, timeout=15)
+        if response.status_code == 200:
+            content = trafilatura.extract(response.text)
+            return content if content else "No readable text found."
+        return f"Access Denied (Status: {response.status_code})"
+    except Exception as e:
+        return f"Extraction Error: {str(e)}"
 
-    # 3. محاولة استخراج روابط التحميل أو المحتوى
-    for item in links:
-        url = item['url']
-        print(f"\n🔗 فحص الرابط: {url}")
+def take_direct_links(url, category):
+    """صيد الروابط المباشرة بناءً على نوع الهدف (كتاب أو أداة)."""
+    headers = {'User-Agent': random.choice(USER_AGENTS)}
+    extensions = {
+        "book": [".pdf", ".epub", ".mobi"],
+        "tool": [".exe", ".zip", ".rar", ".msi", ".tar.gz"]
+    }.get(category, [])
+
+    found_files = []
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(response.text, 'html.parser')
         
-        # إذا كان الطلب كتاباً، نبحث عن روابط PDF مباشرة داخل الصفحة
-        if category == "book":
-            direct_files = extractor.take_specific_links(url, ".pdf")
-            if direct_files:
-                print(f"🎯 وجد TAKER روابط تحميل مباشرة:")
-                for file_url in direct_files:
-                    print(f"   📥 {file_url}")
-            else:
-                print("   📄 لم يجد روابط مباشرة، قد تجد الملف يدوياً في الرابط أعلاه.")
+        for link in soup.find_all('a', href=True):
+            href = link['href']
+            # التحقق من أن الرابط ينتهي بإحدى الصيغ المطلوبة
+            if any(href.lower().endswith(ext) for ext in extensions):
+                # تصحيح الروابط النسبية لتصبح كاملة
+                if href.startswith('/'):
+                    from urllib.parse import urljoin
+                    href = urljoin(url, href)
+                found_files.append(href)
         
-        # إذا كان الطلب عاماً، نأخذ ملخص المحتوى
-        else:
-            content = extractor.take_content(url)
-            print(f"📝 ملخص ما وجده TAKER:\n{content[:300]}...")
-
-if name == "main":
-    print("--- نظام TAKER للمهمات الصعبة ---")
-    goal = input("ماذا تريد أن أحضر لك؟ ")
-    cat = input("نوع الهدف (book / tool / general): ").lower()
-    
-    taker_action(goal, cat)
+        return list(set(found_files)) # إزالة التكرار
+    except:
+        return []
