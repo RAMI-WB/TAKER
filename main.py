@@ -5,6 +5,10 @@ import sqlite3
 import requests
 from datetime import datetime
 
+# --- إعدادات تلجرام ---
+TELEGRAM_TOKEN = "8772178540:AAF_qJy36G9GweD8lJVHC10H73nDMfDfuo8"
+CHAT_ID = "@ItTAKER_bot"
+
 # --- وظائف قاعدة البيانات ---
 
 def init_db():
@@ -34,122 +38,100 @@ def save_loot(goal, category, title, url, file_path="None"):
     conn.commit()
     conn.close()
 
+# --- وظيفة الإرسال إلى تلجرام ---
+
+def send_to_telegram(file_path, caption):
+    """إرسال الملف إلى تلجرام ثم حذفه لتوفير مساحة الهاتف"""
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendDocument"
+    try:
+        with open(file_path, 'rb') as f:
+            files = {'document': f}
+            data = {'chat_id': CHAT_ID, 'caption': caption}
+            response = requests.post(url, files=files, data=data)
+            if response.status_code == 200:
+                print(f"    ☁️ تم الرفع إلى سحابة تلجرام بنجاح!")
+                # اختيارياً: حذف الملف من الهاتف بعد الرفع لتوفير مساحة
+                # os.remove(file_path) 
+            else:
+                print(f"    ⚠️ فشل الرفع لتلجرام: {response.status_code}")
+    except Exception as e:
+        print(f"    ⚠️ خطأ في اتصال تلجرام: {e}")
+
 # --- وظيفة التحميل التلقائي ---
 
-def download_file(url, folder_name):
-    """تحميل الملف وحفظه في مجلد المهمة"""
+def download_file(url, folder_name, goal):
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
     
-    # استخراج اسم الملف من الرابط
     file_name = url.split('/')[-1].split('?')[0]
     if not file_name:
-        file_name = f"downloaded_file_{datetime.now().strftime('%H%M%S')}"
+        file_name = f"file_{datetime.now().strftime('%H%M%S')}"
     
     file_path = os.path.join(folder_name, file_name)
     
     try:
-        print(f"    📥 جاري تحميل: {file_name}...")
+        print(f"    📥 جاري قنص: {file_name}...")
         headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, stream=True, timeout=30)
+        response = requests.get(url, headers=headers, stream=True, timeout=60)
         
         if response.status_code == 200:
             with open(file_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
-            print(f"    ✅ تم التحميل بنجاح: {file_path}")
+            print(f"    ✅ تم التحميل محلياً.")
+            # إرسال للسحابة فوراً
+            send_to_telegram(file_path, f"🎯 TAKER صيد جديد!\nالهدف: {goal}\nالملف: {file_name}")
             return file_path
-        else:
-            print(f"    ❌ فشل التحميل (Status: {response.status_code})")
-            return "Failed"
+        return "Failed"
     except Exception as e:
-        print(f"    ❌ خطأ أثناء التحميل: {e}")
         return "Error"
 
-# --- واجهة المستخدم والمنطق الأساسي ---
-
-def clear_screen():
-    os.system('cls' if os.name == 'nt' else 'clear')
+# --- المنطق الأساسي ---
 
 def main():
     init_db()
-    clear_screen()
+    os.system('clear')
     print("""
     #########################################
-    #           TAKER v1.2 - PRO            #
-    #    The Ultimate File & Info Hunter    #
+    #        TAKER v1.3 - CLOUD EDITION     #
+    #     Hunter: Termux + Telegram Cloud   #
     #########################################
     """)
     
-    print("[1] مهمة صيد وتحميل جديدة")
-    print("[2] استعراض الخزنة (The Vault)")
-    action = input("\n[?] اختر العمليّة: ")
-
-    if action == "2":
-        show_vault()
-        return
-
-    goal = input("\n[?] ماذا تريد أن أحضر لك؟ ")
-    print("\n[1] كتاب (PDF/EPUB)\n[2] أداة/برنامج (EXE/ZIP)\n[3] بحث عام ومعلومات")
-    choice = input("\n[?] اختر النوع: ")
+    goal = input("\n[?] ماذا تريد من TAKER أن يصطاد الآن؟ ")
+    print("\n[1] كتاب (PDF/EPUB)\n[2] أداة (EXE/ZIP/RAR)\n[3] معلومة محددة")
+    choice = input("\n[?] اختر المهمة: ")
     
     mode_map = {"1": "book", "2": "tool", "3": "web"}
     category = mode_map.get(choice, "web")
     
-    # إنشاء مجلد خاص للمهمة
-    folder_name = f"downloads/{goal.replace(' ', '_')}"
+    folder_name = "downloads"
     
-    # 1. مرحلة البحث
     results = search_engine.get_links(goal, category)
-    
     if not results:
-        print("\n[-] TAKER لم يجد أي نتائج.")
+        print("\n[-] لم يتم العثور على أهداف.")
         return
 
-    print(f"\n[+] وجد TAKER {len(results)} مصادر. يبدأ الاستحواذ الآن...")
+    print(f"\n[+] بدأ الاستحواذ على {len(results)} مصادر...")
 
-    # 2. مرحلة الاستخراج والتحميل
     for i, item in enumerate(results, 1):
         url = item['url']
         title = item['title']
-        print(f"\n[{i}] فحص: {title}")
-        
-        # حفظ الرابط في القاعدة
-        save_loot(goal, category, title, url)
+        print(f"\n[{i}] فحص المصدر: {title}")
+save_loot(goal, category, title, url)
         
         if category in ["book", "tool"]:
-            direct_links = extractor.take_direct_links(url, category)
+            # نمرر goal_name لتحسين الدقة (التي شرحناها سابقاً)
+            direct_links = extractor.take_direct_links(url, category, goal)
             if direct_links:
                 for d_url in direct_links:
-                    saved_path = download_file(d_url, folder_name)
+                    saved_path = download_file(d_url, folder_name, goal)
                     if saved_path not in ["Failed", "Error"]:
                         save_loot(goal, f"{category}_file", title, d_url, saved_path)
-                        else:
-                print("    [-] لا توجد روابط مباشرة قابلة للتحميل في هذا المصدر.")
-        else:
-            content = extractor.take_content(url)
-            print(f"    📝 محتوى: {content[:200]}...")
+            else:
+                print("    [-] لم أجد رابط تحميل مباشر هنا.")
 
-    print(f"\n[!] انتهت المهمة. الملفات موجودة في المجلد: {folder_name}")
-
-def show_vault():
-    clear_screen()
-    print("--- TAKER VAULT (تاريخ الصيد) ---")
-    conn = sqlite3.connect('taker_vault.db')
-    cursor = conn.cursor()
-    cursor.execute('SELECT goal, title, file_path FROM loot WHERE file_path != "None" ORDER BY timestamp DESC')
-    rows = cursor.fetchall()
-    
-    if not rows:
-        print("لا توجد ملفات محملة في الخزنة بعد.")
-    for row in rows:
-        print(f"\n[الهدف]: {row[0]}")
-        print(f"[الملف]: {row[1]}")
-        print(f"[المسار]: {row[2]}")
-        print("-" * 30)
-    conn.close()
-    input("\nاضغط Enter للعودة...")
-    main()
+    print(f"\n[!] انتهت المهمة. تفقد حسابك في تلجرام!")
 
 if name == "main":
     main()
