@@ -114,22 +114,24 @@ def main():
 
     print(f"\n[+] بدأ الاستحواذ على {len(results)} مصادر...")
 
-    for i, item in enumerate(results, 1):
-        url = item['url']
-        title = item['title']
-        print(f"\n[{i}] فحص المصدر: {title}")
-save_loot(goal, category, title, url)
-        
-        if category in ["book", "tool"]:
-            # نمرر goal_name لتحسين الدقة (التي شرحناها سابقاً)
-            direct_links = extractor.take_direct_links(url, category, goal)
-            if direct_links:
-                for d_url in direct_links:
-                    saved_path = download_file(d_url, folder_name, goal)
-                    if saved_path not in ["Failed", "Error"]:
-                        save_loot(goal, f"{category}_file", title, d_url, saved_path)
-            else:
-                print("    [-] لم أجد رابط تحميل مباشر هنا.")
+  for i, item in enumerate(results, 1):
+            url = item['url']
+            title = item['title']
+            print(f"\n[{i}] فحص المصدر: {title}")
+            
+            # لاحظ هنا: سطر 122 يجب أن يكون تحت سطر 121 تماماً
+            save_loot(goal, category, title, url)
+            
+            if category in ["book", "tool"]:
+                # تحسين الدقة
+                direct_links = extractor.take_direct_links(url, category, goal)
+                if direct_links: # سطر 127 الآن أصبح في مكانه الصحيح
+                    for d_url in direct_links:
+                        saved_path = download_file(d_url, folder_name, goal)
+                        if saved_path not in ["Failed", "Error"]:
+                            save_loot(goal, f"{category}_file", title, d_url, saved_path)
+                else:
+                    print("    [-] لم أجد رابط تحميل مباشر هنا.")
 
     print(f"\n[!] انتهت المهمة. تفقد حسابك في تلجرام!")
 
